@@ -1,0 +1,254 @@
+---
+title: "STAT 204 Final Project - Creating a Viral TikTok Video"
+author: "Vidyasri G Ravi"
+date: "10/04/2022"
+output: pdf_document
+---
+
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE}
+library(dplyr)
+td3 = read.csv('Updated tiktok.csv')
+td4 = select(td3, duration, length, year, decade, popularity, popular, danceability, energy, key, loudness, speechiness, liveness, valence, tempo, playlist)
+td4
+td2 = select(td1, length, year, decade, popularity, danceability, energy, loudness, speechiness, liveness, valence, playlist)
+str(td1)
+#Make categorical
+unique(td1$playlist)
+tt$year = as.factor(tt$year)
+tt$decade = as.factor(tt$decade)
+tt$length = as.factor(tt$length)
+tt$playlist = as.factor(tt$playlist)
+#tt$danceable = as.factor(tt$danceable)
+tt$popular = as.factor(tt$popular)
+tt$live = as.factor(tt$live)
+str(td4)
+attach(td1)
+td4$decade = as.numeric(td4$decade)
+td4$playlist = as.numeric(td4$playlist)
+```
+
+```{r}
+hist(td1$popularity, col='steelblue', main='Histogram of Popularity', xlab = 'Popularity', ylab = 'Frequency')
+```
+
+```{r}
+B1 = lm(popularity ~ playlist, data=td4)
+summary(B1)
+```
+
+```{r}
+#boxplot(popularity ~ playlist, ylab = "Playlist", las=2)
+stripchart(popularity ~ playlist, vertical=TRUE, las=2, col="#0047AB", ylab = 'Popularity')
+```
+
+```{r}
+{plot(B1$fit, B1$res, col="#0047AB", xlab = 'Fit', ylab = 'Residuals')
+abline(h=0)}
+
+{qqnorm(B1$res, col="#0047AB")
+qqline(B1$res)}
+```
+```{r}
+B2 = aov(popularity ~ playlist * danceability, data=td4)
+summary(B2)
+```
+
+```{r}
+with(data=td2, expr={
+   interaction.plot(playlist, danceability, response=popularity, las = 2, xlab = '')
+   interaction.plot(danceability, playlist, response=popularity, las = 2, xlab = '')})
+
+```
+
+```{r}
+B3 = aov(popularity ~ playlist * decade, data=td4)
+summary(B3)
+```
+```{r}
+B4 = aov(popularity ~ playlist * loudness, data=td4)
+summary(B4)
+```
+
+```{r}
+B5 = aov(popularity ~ playlist * energy, data=td4)
+summary(B5)
+```
+
+
+```{r}
+library(AICcmodavg)
+model.set <- list(B2, B3, B4, B5)
+model.names <- c("Playlist * Danceability", "Playlist * Decade", "Playlist * Loudness", "Playlist * Energy")
+aictab(model.set, modnames = model.names)
+```
+
+```{r}
+with(data=td2, expr={
+   interaction.plot(playlist, decade, response=popularity, las = 2, xlab = '')
+   interaction.plot(decade, playlist, response=popularity, las = 2, xlab = '')})
+
+```
+
+```{r}
+TukeyHSD(B2, which=c("playlist", "decade"))
+```
+
+```{r}
+plot(TukeyHSD(B2, which=c("playlist", "decade")), las=2)
+```
+
+
+
+
+```{r}
+library(dplyr)
+cur1 = read.csv('cur_test.csv')
+cur1 = select(cur1, duration, length, year, decade, popularity, popular, danceability, danceable, energy, key, loudness, speechiness, liveness, live, valence, tempo, playlist)
+cur1
+str(cur1)
+cur1$playlist = as.character(cur1$playlist)
+#cur1$decade = as.(cur1$decade)
+head(cur1)
+```
+
+```{r}
+rename(cur1, P = playlist)
+rename(cur1, D = decade)
+cur1 <- cur1 %>% 
+  rename(D = decade)
+str(cur1)
+library(leaps)
+bestmodel <- regsubsets(popular ~ P + liveness + duration + 
+                              danceability + energy + loudness + 
+                              speechiness + valence + D, data = cur1, nvmax = 21)
+
+summary(bestmodel)
+```
+
+#Above - To choose models
+
+```{r}
+cbind( 
+    Cp     = summary(bestmodel)$cp,
+    r2     = summary(bestmodel)$rsq,
+    Adj_r2 = summary(bestmodel)$adjr2,
+    BIC    =summary(bestmodel)$bic
+)
+```
+
+
+```{r}
+# https://www.statology.org/logistic-regression-in-r/ - Reference
+nrow(td2)
+set.seed(1)
+sample <- sample(c(TRUE, FALSE), nrow(td2), replace=TRUE, prob=c(0.8,0.2))
+train <- td2[sample, ]
+test <- td2[!sample, ]  
+#install.packages("pscl")
+nrow(td2)
+nrow(train)
+nrow(test)
+```
+
+```{r}
+#m1 <- glm(popular ~ playlist + decade + energy + loudness + danceability + liveness +
+#             playlist * energy + playlist * loudness + playlist * danceability + playlist * liveness, 
+#             family="binomial", data=train)
+#options(scipen=999)
+#summary(m1)
+pscl::pR2(m1)["McFadden"]
+```
+
+```{r}
+#Best model with 0.25 McFadden
+#m2 <- glm(popular ~ playlist + energy + loudness + danceability + decade + liveness + length + speechiness +
+#             playlist * energy +  playlist * loudness +  playlist * danceability + playlist * length + playlist * speechiness + playlist * liveness + 
+#             energy * loudness * speechiness
+#             , family="binomial", data=train)
+#options(scipen=999)
+#summary(m2)
+m2 <- glm(popular ~ playlist + energy + loudness + danceability + decade + liveness + speechiness +
+            playlist * energy * loudness * danceability + playlist * decade + decade * energy * loudness * danceability * valence
+          + decade * liveness * speechiness + playlist * liveness + playlist * speechiness + danceability * energy * valence
+             , family="binomial", data=train)
+pscl::pR2(m2)["McFadden Value for Model 1"]
+```
+
+```{r}
+#m1 <- glm(popular ~ playlist + decade + energy + loudness + danceability + liveness +
+             playlist * energy + playlist * loudness + playlist * danceability + playlist * liveness, 
+             family="binomial", data=train)
+#options(scipen=999)
+#summary(m1)
+#pscl::pR2(m1)["McFadden"] = 0.13
+```
+
+```{r}
+nrow(td3)
+set.seed(1)
+sample <- sample(c(TRUE, FALSE), nrow(td3), replace=TRUE, prob=c(0.8,0.2))
+train <- td3[sample, ]
+test <- td3[!sample, ]  
+#install.packages("pscl")
+
+tm3 = glm(popular ~ playlist + danceability + liveness + decade + energy + loudness + playlist * danceability * liveness + playlist * danceability + playlist * liveness + danceability * liveness, family=binomial(link = "logit"), data=train)
+
+tm3 <- glm(popular ~ playlist + energy + loudness + danceability + decade + liveness + speechiness +
+            playlist * energy * loudness * danceability + playlist * decade + decade * energy * loudness * danceability * valence
+          + decade * liveness * speechiness + playlist * liveness + playlist * speechiness + danceability * energy * valence
+             , family="binomial", data=td3)
+pscl::pR2(tm3)["McFadden"]
+
+fittedresult <- predict(tm3, newdata=test, type='response')
+fittedresult <- ifelse(fittedresult > 0.5,1,0)
+head(fittedresult)
+mean(fittedresult == test$popular)
+library(ROCR)
+p <- predict(tm3, newdata=test, type="response")
+pr <- prediction(p, test$popular)
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+{plot(prf, main = 'Model 3')
+abline(0,1, lwd=2, lty=2)}
+library(pROC)
+auc(test$popular,p)
+
+```
+
+```{r}
+tm3<- glm(popular ~ decade + loudness + speechiness + danceability
+            
+             , family="binomial", data=train)
+pscl::pR2(tm3)["McFadden"]
+
+fittedresult <- predict(tm3, newdata=test, type='response')
+fittedresult <- ifelse(fittedresult > 0.5,1,0)
+head(fittedresult)
+mean(fittedresult == test$popular)
+library(ROCR)
+p <- predict(tm3, newdata=test, type="response")
+pr <- prediction(p, test$popular)
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+{plot(prf, main = 'Model 1')
+abline(0,1, lwd=2, lty=2)}
+library(pROC)
+p <- predict(tm3, newdata=test, type="response")
+auc(test$popular,p)
+```
+
+```{r}
+tm2<- glm(popular ~ playlist + energy + loudness + danceability + speechiness +
+            playlist * energy * loudness * danceability + decade * energy * loudness * danceability
+          + liveness * speechiness + playlist * liveness + playlist * speechiness + danceability * energy
+             , family="binomial", data=td3)
+pscl::pR2(tm3)["McFadden"]
+
+```
+
+
+
+
+
+
+
+
+
